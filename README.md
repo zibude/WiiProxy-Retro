@@ -15,3 +15,6 @@ Download Server.py from WiiProxy and run it via command line or directly.
 
 Then, enter the IP address and port number in the terminal's URL field, followed by the website URL.
 Alternatively, if your device allows proxy settings, you can pre-enter the IP address and port.
+
+#aaa
+This is a cheap beta version, so I've combined everything into one.
