@@ -9,6 +9,7 @@ The default port is 8000, but you can change it to your preference.
 ## Requirements
 All you need is a PC or server capable of running Python 3.
 It's easier to use a fixed IP address.
+Installing Pillow beforehand enables image optimization.(pip install Pillow)
 
 ## How to use
 Download Server.py from WiiProxy and run it via command line or directly.
