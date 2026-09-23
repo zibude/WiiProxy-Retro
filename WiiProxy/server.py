@@ -410,19 +410,81 @@ class HybridProxy(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         pass
 
-      
             if method != "HEAD" and (
                 "text/html" in content_type or "text/css" in content_type
             ):
                 text_content = body.decode("utf-8", errors="ignore")
 
                 if "text/html" in content_type:
-                    # JavaScriptの削除（動作フリーズ防止）
+                    # 見出しボタン・折りたたみ・アコーディオン等のUI操作スクリプトのみ許可
+                    def filter_script_tag(match):
+                        full_tag = match.group(0)
+                        attrs = match.group(1)
+                        content = match.group(2)
+
+                        # 害のある追跡・広告用スクリプトは除外
+                        block_keywords = [
+                            "analytics",
+                            "gtm",
+                            "facebook",
+                            "twitter",
+                            "adsystem",
+                            "doubleclick",
+                            "beacon",
+                            "telemetry",
+                        ]
+                        if any(kw in full_tag.lower() for kw in block_keywords):
+                            return ""
+
+                        # 重いWebアプリケーション（React/Vueなど）のライブラリはフリーズ防止のため除外
+                        src_match = re.search(
+                            r'src=["\']([^"\']+)["\']', attrs, re.IGNORECASE
+                        )
+                        if src_match:
+                            src_url = src_match.group(1).lower()
+                            if any(
+                                lib in src_url
+                                for lib in [
+                                    "react",
+                                    "vue",
+                                    "angular",
+                                    "polyfill",
+                                    "webpack",
+                                ]
+                            ):
+                                return ""
+                            # UI開閉用の軽量ライブラリ（jQueryやWikipediaの基本ナビ等）は通過
+                            return full_tag
+
+                        # インラインスクリプトの場合：見出し・ボタン操作・アコーディオンに関するキーワードを含むか判定
+                        ui_keywords = [
+                            "toggle",
+                            "accordion",
+                            "collapse",
+                            "expand",
+                            "section",
+                            "heading",
+                            "button",
+                            "menu",
+                            "collapsible",
+                            "onclick",
+                            "display",
+                            "style.display",
+                        ]
+                        content_lower = content.lower()
+
+                        # UI操作キーワードが含まれており、かつ小さめのスクリプト(15KB以下)であれば許可
+                        if any(
+                            kw in content_lower for kw in ui_keywords
+                        ) and len(content) < 15000:
+                            return full_tag
+
+                        # その他の巨大・無関係なインラインスクリプトは削除
+                        return ""
+
+                    script_pattern = r"(?is)<script\b([^>]*)>(.*?)</script>"
                     text_content = re.sub(
-                        r"<script\b[^<]*(?:(?!</script>)<[^<]*)*</script>",
-                        "",
-                        text_content,
-                        flags=re.IGNORECASE,
+                        script_pattern, filter_script_tag, text_content
                     )
 
                 if is_forward_proxy:
@@ -479,7 +541,6 @@ class HybridProxy(http.server.BaseHTTPRequestHandler):
                     pattern = r"""(?i)\b(src|href|action|srcset|data-src|poster)\s*=\s*(["'])(.*?)\2"""
                     text_content = re.sub(pattern, replace_url, text_content)
 
-                 
                     def replace_css_url(match):
                         url_raw = match.group(1).strip("'\" ")
                         if (
